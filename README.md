@@ -11,7 +11,7 @@ https://www.baslerweb.com/en/products/software/pylon-linux-x86/).
 ### Dependencies
 
 * Some modern Linux distro (for now tested only on ArchLinux)
-* Qbs >= 1.6
+* Qbs >= 1.6 or qmake
 * Qt5 >= 5.7
   * Modules: Core, Gui, Multimedia
   * Additional modules: Quick and QuickControls2 for running the demo app
