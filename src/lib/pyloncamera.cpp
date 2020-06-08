@@ -26,20 +26,13 @@ using Pylon::GrabLoop_ProvidedByInstantCamera;
 using Pylon::CFeaturePersistence;
 using Pylon::String_t;
 
-const static QSize kDefaultImageSize(1280, 916);
-
 static long _frame_counter = 0;
 
 PylonCamera::PylonCamera(QObject *parent) :
-    QObject(parent),
-    m_surface(nullptr),
-    m_camera(nullptr),
-    m_size(kDefaultImageSize),
-    m_startRequested(false)
+    QObject(parent)
 {
     qRegisterMetaType<QVector<QImage> >("QVector<QImage>");
     PylonInitialize();
-    open();
 }
 
 PylonCamera::~PylonCamera()
@@ -48,12 +41,14 @@ PylonCamera::~PylonCamera()
     stop();
 
     disconnect(this, &PylonCamera::cameraRemovedInternal, this, &PylonCamera::handleCameraRemoved);
-    m_camera->DeregisterImageEventHandler(this);
+    if (m_camera) {
+        m_camera->DeregisterImageEventHandler(this);
 
-    m_camera->Close();
-    m_camera->DestroyDevice();
-    delete m_camera;
-    m_camera = nullptr;
+        m_camera->Close();
+        m_camera->DestroyDevice();
+        delete m_camera;
+        m_camera = nullptr;
+    }
 
     PylonTerminate();
 }
@@ -97,17 +92,27 @@ bool PylonCamera::isOpen() const
     return m_camera != nullptr && m_camera->IsOpen();
 }
 
-void PylonCamera::open()
+void PylonCamera::close()
 {
     if (isOpen())
-        return;
+        m_camera->Close();
+}
+
+bool PylonCamera::open(Pylon::IPylonDevice* pDevice)
+{
+    if (isOpen())
+        return true;
 
     try {
-        m_camera = new CInstantCamera(CTlFactory::GetInstance().CreateFirstDevice());
-        setName(m_camera->GetDeviceInfo().GetModelName().c_str());
+        if (pDevice == nullptr)
+            pDevice = CTlFactory::GetInstance().CreateFirstDevice();
+        m_camera = new CInstantCamera(pDevice);
+        setName(m_camera->GetDeviceInfo().GetUserDefinedName().c_str());
         qDebug() << "Opening device" << m_name << "..";
+        m_deviceType = m_camera->GetDeviceInfo().GetModelName().c_str();
         m_camera->Open();
 
+        CFeaturePersistence::SaveToString(m_originalConfig, &m_camera->GetNodeMap());
         if (m_config.empty()) {
             CFeaturePersistence::SaveToString(m_config, &m_camera->GetNodeMap());
             qDebug() << "Saved original config: ( size:" << m_config.size() << " )";
@@ -117,16 +122,19 @@ void PylonCamera::open()
         m_camera->RegisterImageEventHandler(this, RegistrationMode_ReplaceAll, Cleanup_None);
 
         emit isOpenChanged();
+        return true;
     }
     catch (GenICam::GenericException &e) {
         m_camera = nullptr;
         qWarning() << "Camera Error: " << e.GetDescription();
+        m_errorString = e.GetDescription();
     }
+    return false;
 }
 
 void PylonCamera::stop()
 {
-	if (!isOpen())
+    if (!isOpen())
         return;
 
     stopGrabbing();
@@ -168,17 +176,21 @@ bool PylonCamera::start()
         QSize size(img.GetWidth(), img.GetHeight());
         QVideoFrame::PixelFormat f = QVideoFrame::pixelFormatFromImageFormat(QImage::Format_RGB32);
         QVideoSurfaceFormat format(size, f);
-        m_surface->start(format);
-
+        if (m_surface->start(format)) {
+            QImage qimage = toQImage(img).convertToFormat(QImage::Format_RGB32);
+            m_surface->present(qimage);
+        } else {
+            qWarning() << "Failed to start videoSurface" << m_surface->error();
+        }
     }
     catch (GenICam::GenericException &e) {
         m_camera = nullptr;
         qWarning() << "Camera Error: " << e.GetDescription();
+        m_errorString = e.GetDescription();
         return false;
     }
 
-    startGrabbing();
-    return true;
+    return startGrabbing();
 }
 
 bool PylonCamera::capture(int nFrames, const QString &config)
@@ -215,14 +227,21 @@ bool PylonCamera::capture(int nFrames, const QString &config)
     return true;
 }
 
-void PylonCamera::startGrabbing()
+bool PylonCamera::startGrabbing()
 {
     if (!isOpen())
         throw std::runtime_error("Camera failed to initialize");
 
     connect(this, &PylonCamera::frameGrabbedInternal, this, &PylonCamera::renderFrame);
-    m_camera->RegisterConfiguration(this, RegistrationMode_ReplaceAll, Cleanup_None);
-    m_camera->StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
+    try {
+        m_camera->RegisterConfiguration(this, RegistrationMode_ReplaceAll, Cleanup_None);
+        m_camera->StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
+    }   catch (GenICam::GenericException &e) {
+        qWarning() << "Camera Error: " << e.GetDescription();
+        m_errorString = e.GetDescription();
+        return false;
+    }
+    return true;
 }
 
 void PylonCamera::stopGrabbing()
@@ -237,8 +256,16 @@ void PylonCamera::stopGrabbing()
         m_camera->StopGrabbing();
 }
 
+bool PylonCamera::isGrabbing() const
+{
+    if (!m_camera)
+        return false;
+    return m_camera->IsGrabbing();
+}
+
 void PylonCamera::OnImageGrabbed(CInstantCamera& camera, const CGrabResultPtr& ptrGrab)
 {
+    Q_UNUSED(camera)
     CImageFormatConverter fc;
     fc.OutputPixelFormat = PixelType_RGB8packed;
 
@@ -246,7 +273,7 @@ void PylonCamera::OnImageGrabbed(CInstantCamera& camera, const CGrabResultPtr& p
 
     fc.Convert(pylonImage, ptrGrab);
     if (!pylonImage.IsValid()) {
-        qWarning() << "failed to conver frame" << _frame_counter;
+        qWarning() << "failed to convert frame" << _frame_counter;
         return;
     }
 
@@ -262,7 +289,7 @@ void PylonCamera::OnCameraDeviceRemoved( CInstantCamera& /*camera*/)
 
 void PylonCamera::handleCameraRemoved()
 {
-	if (!isOpen())
+    if (!isOpen())
         return;
 
     stopGrabbing();
@@ -286,7 +313,7 @@ QImage PylonCamera::toQImage(CPylonImage &pylonImage)
     void *buffer = pylonImage.GetBuffer();
     int step = pylonImage.GetAllocatedBufferSize() / height;
     QImage img(static_cast<uchar*>(buffer), width, height, step, QImage::Format_RGB888);
-    return img.scaled(m_size);
+    return img;
 }
 
 void PylonCamera::renderFrame(const QImage &img)
@@ -296,7 +323,8 @@ void PylonCamera::renderFrame(const QImage &img)
 
     QVideoFrame frame(img);
     bool r = m_surface->present(frame);
-    //qDebug() << "grabbed frame" << _frame_counter++ << r << img;
+    if (!r)
+        qDebug() << m_surface->error();
 }
 
 QVector<CPylonImage> PylonCamera::grabImage(int nFrames)
@@ -313,7 +341,6 @@ QVector<CPylonImage> PylonCamera::grabImage(int nFrames)
     m_camera->StartGrabbing(nFrames);
 
     while(m_camera->IsGrabbing()){
-        //qDebug() << "grabbed frame " << _frame_counter++;
         CPylonImage image;
         m_camera->RetrieveResult(1000, ptrGrab, TimeoutHandling_Return);
         if (ptrGrab->GrabSucceeded()) {
@@ -329,6 +356,21 @@ QVector<CPylonImage> PylonCamera::grabImage(int nFrames)
 void PylonCamera::restoreOriginalConfig()
 {
     qDebug() << "Restoring original camera config [ config.size="
-             << m_config.size() << "]";
-    CFeaturePersistence::LoadFromString(m_config, &m_camera->GetNodeMap());
+             << m_originalConfig.size() << "]";
+    CFeaturePersistence::LoadFromString(m_originalConfig, &m_camera->GetNodeMap());
+}
+
+QString PylonCamera::errorString() const
+{
+    return m_errorString;
+}
+
+QString PylonCamera::deviceType() const
+{
+    return m_deviceType;
+}
+
+Pylon::String_t PylonCamera::originalConfig() const
+{
+    return m_originalConfig;
 }

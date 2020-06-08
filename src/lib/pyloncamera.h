@@ -16,12 +16,12 @@ namespace Pylon {
     class CInstantCamera;
     class CPylonImage;
     class CGrabResultPtr;
+    class IPylonDevice;
 }
 
-class PylonCamera : public QObject
-    , public Pylon::CImageEventHandler
-    , public Pylon::CConfigurationEventHandler
-
+class PylonCamera : public QObject,
+        public Pylon::CImageEventHandler,
+        public Pylon::CConfigurationEventHandler
 {
     Q_OBJECT
     Q_PROPERTY(bool isOpen READ isOpen NOTIFY isOpenChanged)
@@ -33,12 +33,18 @@ public:
     explicit PylonCamera(QObject *parent = nullptr);
     virtual ~PylonCamera();
 
-    void open();
+    bool open(Pylon::IPylonDevice *pDevice = nullptr);
     void setVideoSurface(QAbstractVideoSurface *surface);
     QAbstractVideoSurface *videoSurface() const;
     QString name() const;
     bool isOpen() const;
+    void close();
     void setConfig(const QString& configStr);
+
+    Pylon::String_t originalConfig() const;
+
+    QString deviceType() const;
+    QString errorString() const;
 
 signals:
     void isOpenChanged();
@@ -54,6 +60,7 @@ signals:
 public slots:
     bool start();
     void stop();
+    bool isGrabbing() const;
     bool capture(int n = 1, const QString &config = QString());
 
 private slots:
@@ -70,7 +77,7 @@ private:
     // FIXME Move to p_impl??
     virtual void OnCameraDeviceRemoved(Pylon::CInstantCamera&);
 
-    void startGrabbing();
+    bool startGrabbing();
     void stopGrabbing();
     void setName(const char *name);
 
@@ -78,13 +85,12 @@ private:
     QImage toQImage(Pylon::CPylonImage &pylonImage);
     void restoreOriginalConfig();
 
-private:
-    QAbstractVideoSurface *m_surface;
-    Pylon::CInstantCamera *m_camera;
-    QSize m_size;
-    bool m_startRequested;
-    QString m_name;
+    QAbstractVideoSurface *m_surface = nullptr;
+    Pylon::CInstantCamera *m_camera = nullptr;
+    bool m_startRequested = false;
+    QString m_name, m_deviceType, m_errorString;
     Pylon::String_t m_config;
+    Pylon::String_t m_originalConfig;
 };
 
 #endif // PYLON_CAMERA_H
