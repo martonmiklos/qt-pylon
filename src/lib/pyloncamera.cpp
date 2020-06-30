@@ -222,6 +222,7 @@ bool PylonCamera::capture(int nFrames, const QString &config)
         for(int i = 0; i < v.size(); ++i) {
             images[i] = PylonCamera::toQImage(v[i]);
         }
+        emit frameGrabbedInternal(images.last());
         emit captured(images);
     });
     return true;
