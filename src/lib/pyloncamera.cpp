@@ -215,16 +215,26 @@ bool PylonCamera::capture(int nFrames, const QString &config)
         }
     }
 
-    QtConcurrent::run([this, nFrames]() {
-        auto v = grabImage(nFrames);
-        QVector<QImage> images(v.size());
+    if (nFrames == 1) {
+        auto v = grabImage(nFrames).first();
+        auto image = PylonCamera::toQImage(v);
+        emit frameGrabbedInternal(image);
+        QVector<QImage> vect;
+        vect << image;
+        emit captured(vect);
+    } else {
+        QtConcurrent::run([this, nFrames]() {
+            auto v = grabImage(nFrames);
+            QVector<QImage> images(v.size());
 
-        for(int i = 0; i < v.size(); ++i) {
-            images[i] = PylonCamera::toQImage(v[i]);
-        }
-        emit frameGrabbedInternal(images.last());
-        emit captured(images);
-    });
+            for(int i = 0; i < v.size(); ++i) {
+                images[i] = PylonCamera::toQImage(v[i]);
+            }
+            emit frameGrabbedInternal(images.last());
+            emit captured(images);
+        });
+    }
+
     return true;
 }
 
