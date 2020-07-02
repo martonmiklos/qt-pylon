@@ -94,6 +94,8 @@ bool PylonCamera::isOpen() const
 void PylonCamera::close()
 {
     if (isOpen()) {
+        if (m_camera->IsGrabbing())
+            m_camera->StopGrabbing();
         m_camera->Close();
         m_camera->DeregisterImageEventHandler(this);
     }
@@ -214,7 +216,7 @@ bool PylonCamera::start()
     return startGrabbing();
 }
 
-bool PylonCamera::capture(int nFrames, const QString &config)
+bool PylonCamera::capture(int nFrames, const QString &config, bool keepGrabbing)
 {
     if (!isOpen()) {
         qWarning() << "Failed to capture: Camera not open!";
@@ -237,7 +239,7 @@ bool PylonCamera::capture(int nFrames, const QString &config)
     }
 
     if (nFrames == 1) {
-        auto v = grabImage(nFrames).first();
+        auto v = grabImage(nFrames, keepGrabbing).first();
         auto img = PylonCamera::toQImage(v);
         emit frameGrabbedInternal(img);
         QVector<QImage> vect;
@@ -367,7 +369,7 @@ void PylonCamera::renderFrame(const QImage &img)
         qDebug() << m_surface->error();
 }
 
-QVector<CPylonImage> PylonCamera::grabImage(int nFrames)
+QVector<CPylonImage> PylonCamera::grabImage(int nFrames, bool keepGrabbing)
 {
     if (!isOpen())
         throw std::runtime_error("Camera failed to initialize");
@@ -378,7 +380,8 @@ QVector<CPylonImage> PylonCamera::grabImage(int nFrames)
 
     CGrabResultPtr ptrGrab;
 
-    m_camera->StartGrabbing(nFrames);
+    if (!m_camera->IsGrabbing())
+        m_camera->StartGrabbing(nFrames);
 
     while(m_camera->IsGrabbing()){
         CPylonImage image;
@@ -389,7 +392,8 @@ QVector<CPylonImage> PylonCamera::grabImage(int nFrames)
         images += image;
     }
 
-    m_camera->StopGrabbing();
+    if (!keepGrabbing)
+        m_camera->StopGrabbing();
     return images;
 }
 

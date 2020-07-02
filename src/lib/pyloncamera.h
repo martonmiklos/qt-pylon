@@ -66,7 +66,7 @@ public slots:
     bool start();
     void stop();
     bool isGrabbing() const;
-    bool capture(int n = 1, const QString &config = QString());
+    bool capture(int n = 1, const QString &config = QString(), bool keepGrabbing = false);
 
 private slots:
     void renderFrame(const QImage &frame);
@@ -86,7 +86,7 @@ private:
     void stopGrabbing();
     void setName(const char *name);
 
-    QVector<Pylon::CPylonImage> grabImage(int n = 1);
+    QVector<Pylon::CPylonImage> grabImage(int n = 1, bool keepGrabbing = false);
     QImage toQImage(Pylon::CPylonImage &pylonImage);
     void restoreOriginalConfig();
 
