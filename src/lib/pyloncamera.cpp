@@ -9,22 +9,23 @@
 
 #include <pylon/PylonIncludes.h>
 
+using Pylon::CDeviceInfo;
+using Pylon::CFeaturePersistence;
+using Pylon::CGrabResultPtr;
+using Pylon::CImageEventHandler;
+using Pylon::CImageFormatConverter;
 using Pylon::CInstantCamera;
 using Pylon::CPylonImage;
-using Pylon::CGrabResultPtr;
-using Pylon::CImageFormatConverter;
+using Pylon::CTlFactory;
+using Pylon::Cleanup_None;
+using Pylon::GrabLoop_ProvidedByInstantCamera;
+using Pylon::GrabStrategy_OneByOne;
+using Pylon::PixelType_RGB8packed;
 using Pylon::PylonInitialize;
 using Pylon::PylonTerminate;
-using Pylon::CTlFactory;
-using Pylon::PixelType_RGB8packed;
-using Pylon::TimeoutHandling_Return;
-using Pylon::CImageEventHandler;
 using Pylon::RegistrationMode_ReplaceAll;
-using Pylon::Cleanup_None;
-using Pylon::GrabStrategy_OneByOne;
-using Pylon::GrabLoop_ProvidedByInstantCamera;
-using Pylon::CFeaturePersistence;
 using Pylon::String_t;
+using Pylon::TimeoutHandling_Return;
 
 static long _frame_counter = 0;
 
@@ -104,8 +105,28 @@ bool PylonCamera::open(Pylon::IPylonDevice* pDevice)
         return true;
 
     try {
+        Pylon::CDeviceInfo di;
+        di.SetIpAddress(m_ipAddress.toLocal8Bit().constData());
+        CTlFactory& TlFactory = CTlFactory::GetInstance();
+        Pylon::DeviceInfoList_t lstDevices;
+        TlFactory.EnumerateDevices(lstDevices);
+        if (lstDevices.empty())
+            return false;
+
+        bool found = false;
+        for (auto cdi : lstDevices) {
+            if (cdi.GetIpAddress() == di.GetIpAddress()) {
+                di = cdi;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+            return false;
+
         if (pDevice == nullptr)
-            pDevice = CTlFactory::GetInstance().CreateFirstDevice();
+            pDevice = CTlFactory::GetInstance().CreateDevice(di);
         m_camera = new CInstantCamera(pDevice);
         setName(m_camera->GetDeviceInfo().GetUserDefinedName().c_str());
         qDebug() << "Opening device" << m_name << "..";
@@ -369,6 +390,16 @@ void PylonCamera::restoreOriginalConfig()
     qDebug() << "Restoring original camera config [ config.size="
              << m_originalConfig.size() << "]";
     CFeaturePersistence::LoadFromString(m_originalConfig, &m_camera->GetNodeMap());
+}
+
+QString PylonCamera::ipAddress() const
+{
+    return m_ipAddress;
+}
+
+void PylonCamera::setIpAddress(const QString &ipAddress)
+{
+    m_ipAddress = ipAddress;
 }
 
 QString PylonCamera::errorString() const

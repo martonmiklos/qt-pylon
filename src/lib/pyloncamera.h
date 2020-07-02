@@ -46,6 +46,9 @@ public:
     QString deviceType() const;
     QString errorString() const;
 
+    QString ipAddress() const;
+    void setIpAddress(const QString &ipAddress);
+
 signals:
     void isOpenChanged();
     void nameChanged();
@@ -88,7 +91,7 @@ private:
     QAbstractVideoSurface *m_surface = nullptr;
     Pylon::CInstantCamera *m_camera = nullptr;
     bool m_startRequested = false;
-    QString m_name, m_deviceType, m_errorString;
+    QString m_name, m_deviceType, m_errorString, m_ipAddress;
     Pylon::String_t m_config;
     Pylon::String_t m_originalConfig;
 };
