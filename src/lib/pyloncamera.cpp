@@ -39,11 +39,10 @@ PylonCamera::PylonCamera(QObject *parent) :
 PylonCamera::~PylonCamera()
 {
     stop();
+    close();
 
     disconnect(this, &PylonCamera::cameraRemovedInternal, this, &PylonCamera::handleCameraRemoved);
     if (m_camera) {
-        m_camera->DeregisterImageEventHandler(this);
-
         m_camera->Close();
         m_camera->DestroyDevice();
         delete m_camera;
@@ -94,8 +93,10 @@ bool PylonCamera::isOpen() const
 
 void PylonCamera::close()
 {
-    if (isOpen())
+    if (isOpen()) {
         m_camera->Close();
+        m_camera->DeregisterImageEventHandler(this);
+    }
 }
 
 bool PylonCamera::open(Pylon::IPylonDevice* pDevice)
