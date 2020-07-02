@@ -54,6 +54,8 @@ signals:
     void nameChanged();
     void videoSurfaceChanged();
     void captured(const QVector<QImage> &imgs);
+    void grabbingStarted();
+    void grabbingStopped();
 
     // Internal usage only
     // frame will be in Qimge::Format_RGB32

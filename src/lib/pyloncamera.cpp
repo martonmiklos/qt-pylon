@@ -238,11 +238,16 @@ bool PylonCamera::capture(int nFrames, const QString &config)
 
     if (nFrames == 1) {
         auto v = grabImage(nFrames).first();
-        auto image = PylonCamera::toQImage(v);
-        emit frameGrabbedInternal(image);
+        auto img = PylonCamera::toQImage(v);
+        emit frameGrabbedInternal(img);
         QVector<QImage> vect;
-        vect << image;
-        renderFrame(image.convertToFormat(QImage::Format_RGB32));
+        vect << img;
+        if (m_surface && !m_surface->isActive()) {
+            QVideoFrame::PixelFormat f = QVideoFrame::pixelFormatFromImageFormat(QImage::Format_RGB32);
+            QVideoSurfaceFormat format(img.size(), f);
+            m_surface->start(format);
+        }
+        renderFrame(img.convertToFormat(QImage::Format_RGB32));
         emit captured(vect);
     } else {
         QtConcurrent::run([this, nFrames]() {
@@ -269,6 +274,7 @@ bool PylonCamera::startGrabbing()
     try {
         m_camera->RegisterConfiguration(this, RegistrationMode_ReplaceAll, Cleanup_None);
         m_camera->StartGrabbing(GrabStrategy_OneByOne, GrabLoop_ProvidedByInstantCamera);
+        emit grabbingStarted();
     }   catch (GenICam::GenericException &e) {
         qWarning() << "Camera Error: " << e.GetDescription();
         m_errorString = e.GetDescription();
@@ -287,6 +293,7 @@ void PylonCamera::stopGrabbing()
 
     if (m_camera->IsGrabbing())
         m_camera->StopGrabbing();
+    emit grabbingStopped();
 }
 
 bool PylonCamera::isGrabbing() const
