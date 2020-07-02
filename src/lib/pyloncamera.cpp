@@ -38,7 +38,6 @@ PylonCamera::PylonCamera(QObject *parent) :
 
 PylonCamera::~PylonCamera()
 {
-    qDebug() << __PRETTY_FUNCTION__;
     stop();
 
     disconnect(this, &PylonCamera::cameraRemovedInternal, this, &PylonCamera::handleCameraRemoved);
@@ -242,6 +241,7 @@ bool PylonCamera::capture(int nFrames, const QString &config)
         emit frameGrabbedInternal(image);
         QVector<QImage> vect;
         vect << image;
+        renderFrame(image.convertToFormat(QImage::Format_RGB32));
         emit captured(vect);
     } else {
         QtConcurrent::run([this, nFrames]() {

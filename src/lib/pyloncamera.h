@@ -31,7 +31,7 @@ class PylonCamera : public QObject,
 
 public:
     explicit PylonCamera(QObject *parent = nullptr);
-    virtual ~PylonCamera();
+    ~PylonCamera();
 
     bool open(Pylon::IPylonDevice *pDevice = nullptr);
     void setVideoSurface(QAbstractVideoSurface *surface);
