@@ -49,6 +49,8 @@ public:
     QString ipAddress() const;
     void setIpAddress(const QString &ipAddress);
 
+    void setOutputLine(bool outputLine);
+
 signals:
     void isOpenChanged();
     void nameChanged();

@@ -8,7 +8,11 @@
 #include <QtConcurrent/QtConcurrentRun>
 
 #include <pylon/PylonIncludes.h>
+#include <pylon/EnumParameter.h>
+#include <pylon/BooleanParameter.h>
 
+using Pylon::CEnumParameter;
+using Pylon::CBooleanParameter;
 using Pylon::CDeviceInfo;
 using Pylon::CFeaturePersistence;
 using Pylon::CGrabResultPtr;
@@ -205,6 +209,9 @@ bool PylonCamera::start()
         } else {
             qWarning() << "Failed to start videoSurface" << m_surface->error();
         }
+        auto & nodemap = m_camera->GetNodeMap();
+        CEnumParameter(nodemap, "LineSelector").SetValue("Out1");
+        CEnumParameter(nodemap, "LineSource").SetValue("ExposureActive");
     }
     catch (GenICam::GenericException &e) {
         m_camera = nullptr;
@@ -239,6 +246,7 @@ bool PylonCamera::capture(int nFrames, const QString &config, bool keepGrabbing)
     }
 
     if (nFrames == 1) {
+        m_camera->StopGrabbing();
         auto v = grabImage(nFrames, keepGrabbing).first();
         auto img = PylonCamera::toQImage(v);
         emit frameGrabbedInternal(img);
@@ -380,20 +388,29 @@ QVector<CPylonImage> PylonCamera::grabImage(int nFrames, bool keepGrabbing)
 
     CGrabResultPtr ptrGrab;
 
-    if (!m_camera->IsGrabbing())
-        m_camera->StartGrabbing(nFrames);
-
-    while(m_camera->IsGrabbing()){
+    if (nFrames == 1) {
         CPylonImage image;
-        m_camera->RetrieveResult(1000, ptrGrab, TimeoutHandling_Return);
+        m_camera->GrabOne(1000, ptrGrab);
         if (ptrGrab->GrabSucceeded()) {
             fc.Convert(image, ptrGrab);
         }
         images += image;
-    }
+    } else {
+        if (!m_camera->IsGrabbing())
+            m_camera->StartGrabbing(nFrames, Pylon::GrabStrategy_LatestImageOnly);
 
-    if (!keepGrabbing)
-        m_camera->StopGrabbing();
+        while(m_camera->IsGrabbing()){
+            CPylonImage image;
+            m_camera->RetrieveResult(1000, ptrGrab, TimeoutHandling_Return);
+            if (ptrGrab->GrabSucceeded()) {
+                fc.Convert(image, ptrGrab);
+            }
+            images += image;
+        }
+
+        if (!keepGrabbing)
+            m_camera->StopGrabbing();
+    }
     return images;
 }
 
@@ -412,6 +429,17 @@ QString PylonCamera::ipAddress() const
 void PylonCamera::setIpAddress(const QString &ipAddress)
 {
     m_ipAddress = ipAddress;
+}
+
+void PylonCamera::setOutputLine(bool outputLine)
+{
+    try {
+        auto & nodemap = m_camera->GetNodeMap();
+        CEnumParameter(nodemap, "LineSelector").SetValue("Out1");
+        CBooleanParameter(nodemap, "UserOutputValue").SetValue(outputLine);
+    } catch (GenICam::GenericException &e) {
+        qWarning() << e.what();
+    }
 }
 
 QString PylonCamera::errorString() const
