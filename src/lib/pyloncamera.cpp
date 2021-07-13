@@ -105,7 +105,7 @@ void PylonCamera::close()
     }
 }
 
-bool PylonCamera::open(Pylon::IPylonDevice* pDevice)
+bool PylonCamera::open(Pylon::IPylonDevice* pDevice, bool saveConfig)
 {
     if (isOpen())
         return true;
@@ -120,7 +120,7 @@ bool PylonCamera::open(Pylon::IPylonDevice* pDevice)
             return false;
 
         bool found = false;
-        for (auto cdi : lstDevices) {
+        for (auto & cdi : lstDevices) {
             if (cdi.GetIpAddress() == di.GetIpAddress()) {
                 di = cdi;
                 found = true;
@@ -137,12 +137,21 @@ bool PylonCamera::open(Pylon::IPylonDevice* pDevice)
         setName(m_camera->GetDeviceInfo().GetUserDefinedName().c_str());
         qDebug() << "Opening device" << m_name << "..";
         m_deviceType = m_camera->GetDeviceInfo().GetModelName().c_str();
+
         m_camera->Open();
 
-        CFeaturePersistence::SaveToString(m_originalConfig, &m_camera->GetNodeMap());
-        if (m_config.empty()) {
-            CFeaturePersistence::SaveToString(m_config, &m_camera->GetNodeMap());
-            qDebug() << "Saved original config: ( size:" << m_config.size() << " )";
+        auto& nodemap = m_camera->GetNodeMap();
+        // Select the Frame Start trigger
+        CEnumParameter(nodemap, "TriggerSelector").SetValue("FrameStart");
+        // Enable triggered image acquisition for the Frame Start trigger
+        CEnumParameter(nodemap, "TriggerMode").SetValue("On");
+
+        if (saveConfig) {
+            CFeaturePersistence::SaveToString(m_originalConfig, &m_camera->GetNodeMap());
+            if (m_config.empty()) {
+                CFeaturePersistence::SaveToString(m_config, &m_camera->GetNodeMap());
+                qDebug() << "Saved original config: ( size:" << m_config.size() << " )";
+            }
         }
 
         connect(this, &PylonCamera::cameraRemovedInternal, this, &PylonCamera::handleCameraRemoved);
@@ -152,6 +161,8 @@ bool PylonCamera::open(Pylon::IPylonDevice* pDevice)
         return true;
     }
     catch (GenICam::GenericException &e) {
+        if (m_camera->IsOpen())
+            m_camera->Close();
         m_camera = nullptr;
         qWarning() << "Camera Error: " << e.GetDescription();
         m_errorString = e.GetDescription();
@@ -170,10 +181,10 @@ void PylonCamera::stop()
     emit isOpenChanged();
 }
 
-bool PylonCamera::start()
+bool PylonCamera::start(bool saveConfig)
 {
     m_startRequested = true;
-    open();
+    open(nullptr, saveConfig);
 
     if (!isOpen()) {
         qWarning() << "Failed to open camera!";
@@ -211,7 +222,7 @@ bool PylonCamera::start()
         }
     }
     catch (GenICam::GenericException &e) {
-        m_camera = nullptr;
+        //m_camera = nullptr;
         qWarning() << "Camera Error: " << e.GetDescription();
         m_errorString = e.GetDescription();
         return false;
@@ -403,9 +414,11 @@ QVector<CPylonImage> PylonCamera::grabImage(int nFrames, bool keepGrabbing)
 
 void PylonCamera::restoreOriginalConfig()
 {
-    qDebug() << "Restoring original camera config [ config.size="
+    if (m_originalConfig.size()) {
+        qDebug() << "Restoring original camera config [ config.size="
              << m_originalConfig.size() << "]";
-    CFeaturePersistence::LoadFromString(m_originalConfig, &m_camera->GetNodeMap());
+        CFeaturePersistence::LoadFromString(m_originalConfig, &m_camera->GetNodeMap());
+    }
 }
 
 QString PylonCamera::ipAddress() const

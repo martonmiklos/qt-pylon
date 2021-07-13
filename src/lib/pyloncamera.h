@@ -33,7 +33,7 @@ public:
     explicit PylonCamera(QObject *parent = nullptr);
     ~PylonCamera();
 
-    bool open(Pylon::IPylonDevice *pDevice = nullptr);
+    bool open(Pylon::IPylonDevice *pDevice = nullptr, bool saveConfig = true);
     void setVideoSurface(QAbstractVideoSurface *surface);
     QAbstractVideoSurface *videoSurface() const;
     QString name() const;
@@ -65,7 +65,7 @@ signals:
     void cameraRemovedInternal();
 
 public slots:
-    bool start();
+    bool start(bool saveConfig = true);
     void stop();
     bool isGrabbing() const;
     bool capture(int n = 1, const QString &config = QString(), bool keepGrabbing = false);
