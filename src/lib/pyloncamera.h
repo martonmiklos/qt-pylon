@@ -51,6 +51,8 @@ public:
 
     void setOutputLine(bool outputLine);
 
+    void setHardwareTriggerEnabled(bool hwTriggerEnabled);
+
 signals:
     void isOpenChanged();
     void nameChanged();

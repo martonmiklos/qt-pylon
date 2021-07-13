@@ -140,12 +140,6 @@ bool PylonCamera::open(Pylon::IPylonDevice* pDevice, bool saveConfig)
 
         m_camera->Open();
 
-        auto& nodemap = m_camera->GetNodeMap();
-        // Select the Frame Start trigger
-        CEnumParameter(nodemap, "TriggerSelector").SetValue("FrameStart");
-        // Enable triggered image acquisition for the Frame Start trigger
-        CEnumParameter(nodemap, "TriggerMode").SetValue("On");
-
         if (saveConfig) {
             CFeaturePersistence::SaveToString(m_originalConfig, &m_camera->GetNodeMap());
             if (m_config.empty()) {
@@ -440,6 +434,15 @@ void PylonCamera::setOutputLine(bool outputLine)
     } catch (GenICam::GenericException &e) {
         qWarning() << e.what();
     }
+}
+
+void PylonCamera::setHardwareTriggerEnabled(bool hwTriggerEnabled)
+{
+    auto& nodemap = m_camera->GetNodeMap();
+    // Select the Frame Start trigger
+    CEnumParameter(nodemap, "TriggerSelector").SetValue("FrameStart");
+    // Enable triggered image acquisition for the Frame Start trigger
+    CEnumParameter(nodemap, "TriggerMode").SetValue(hwTriggerEnabled ? "On" : "Off");
 }
 
 QString PylonCamera::errorString() const
