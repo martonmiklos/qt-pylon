@@ -53,6 +53,9 @@ public:
 
     void setHardwareTriggerEnabled(bool hwTriggerEnabled);
 
+    QString serialNumber() const;
+    void setSerialNumber(const QString &serialNumber);
+
 signals:
     void isOpenChanged();
     void nameChanged();
@@ -97,7 +100,7 @@ private:
     QAbstractVideoSurface *m_surface = nullptr;
     Pylon::CInstantCamera *m_camera = nullptr;
     bool m_startRequested = false;
-    QString m_name, m_deviceType, m_errorString, m_ipAddress;
+    QString m_name, m_deviceType, m_errorString, m_ipAddress, m_serialNumber;
     Pylon::String_t m_config;
     Pylon::String_t m_originalConfig;
 };

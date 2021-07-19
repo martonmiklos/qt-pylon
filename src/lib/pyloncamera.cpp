@@ -112,7 +112,10 @@ bool PylonCamera::open(Pylon::IPylonDevice* pDevice, bool saveConfig)
 
     try {
         Pylon::CDeviceInfo di;
-        di.SetIpAddress(m_ipAddress.toLocal8Bit().constData());
+        if (!m_ipAddress.isEmpty())
+            di.SetIpAddress(m_ipAddress.toLocal8Bit().constData());
+        if (!m_serialNumber.isEmpty())
+            di.SetSerialNumber(m_serialNumber.toLocal8Bit().constData());
         CTlFactory& TlFactory = CTlFactory::GetInstance();
         Pylon::DeviceInfoList_t lstDevices;
         TlFactory.EnumerateDevices(lstDevices);
@@ -121,7 +124,8 @@ bool PylonCamera::open(Pylon::IPylonDevice* pDevice, bool saveConfig)
 
         bool found = false;
         for (auto & cdi : lstDevices) {
-            if (cdi.GetIpAddress() == di.GetIpAddress()) {
+            if ((!m_ipAddress.isEmpty() && cdi.GetIpAddress() == di.GetIpAddress())
+                    && (!m_serialNumber.isEmpty() && cdi.GetSerialNumber() == di.GetSerialNumber())) {
                 di = cdi;
                 found = true;
                 break;
@@ -413,6 +417,16 @@ void PylonCamera::restoreOriginalConfig()
              << m_originalConfig.size() << "]";
         CFeaturePersistence::LoadFromString(m_originalConfig, &m_camera->GetNodeMap());
     }
+}
+
+QString PylonCamera::serialNumber() const
+{
+    return m_serialNumber;
+}
+
+void PylonCamera::setSerialNumber(const QString &serialNumber)
+{
+    m_serialNumber = serialNumber;
 }
 
 QString PylonCamera::ipAddress() const
