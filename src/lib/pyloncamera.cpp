@@ -125,7 +125,7 @@ bool PylonCamera::open(Pylon::IPylonDevice* pDevice, bool saveConfig)
         bool found = false;
         for (auto & cdi : lstDevices) {
             if ((!m_ipAddress.isEmpty() && cdi.GetIpAddress() == di.GetIpAddress())
-                    && (!m_serialNumber.isEmpty() && cdi.GetSerialNumber() == di.GetSerialNumber())) {
+                    || (!m_serialNumber.isEmpty() && cdi.GetSerialNumber() == di.GetSerialNumber())) {
                 di = cdi;
                 found = true;
                 break;
@@ -251,7 +251,7 @@ bool PylonCamera::capture(int nFrames, const QString &config, bool keepGrabbing)
         }
     }
 
-    if (nFrames == 1) {
+    if (nFrames == 0) {
         auto v = grabImage(nFrames, keepGrabbing).first();
         auto img = PylonCamera::toQImage(v);
         emit frameGrabbedInternal(img);
@@ -266,14 +266,18 @@ bool PylonCamera::capture(int nFrames, const QString &config, bool keepGrabbing)
         emit captured(vect);
     } else {
         QtConcurrent::run([this, nFrames]() {
-            auto v = grabImage(nFrames);
-            QVector<QImage> images(v.size());
+            auto framesLeft = nFrames;
+            while (framesLeft) {
+                auto v = grabImage(nFrames);
+                QVector<QImage> images(v.size());
+                framesLeft -= v.size();
 
-            for(int i = 0; i < v.size(); ++i) {
-                images[i] = PylonCamera::toQImage(v[i]);
+                for(int i = 0; i < v.size(); ++i) {
+                    images[i] = PylonCamera::toQImage(v[i]);
+                }
+                emit frameGrabbedInternal(images.last());
+                emit captured(images);
             }
-            emit frameGrabbedInternal(images.last());
-            emit captured(images);
         });
     }
 
