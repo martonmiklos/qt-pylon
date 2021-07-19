@@ -269,14 +269,16 @@ bool PylonCamera::capture(int nFrames, const QString &config, bool keepGrabbing)
             auto framesLeft = nFrames;
             while (framesLeft) {
                 auto v = grabImage(nFrames);
-                QVector<QImage> images(v.size());
-                framesLeft -= v.size();
+                if (v.size()) {
+                    QVector<QImage> images(v.size());
+                    framesLeft -= v.size();
 
-                for(int i = 0; i < v.size(); ++i) {
-                    images[i] = PylonCamera::toQImage(v[i]);
+                    for(int i = 0; i < v.size(); ++i) {
+                        images[i] = PylonCamera::toQImage(v[i]);
+                    }
+                    emit frameGrabbedInternal(images.last());
+                    emit captured(images);
                 }
-                emit frameGrabbedInternal(images.last());
-                emit captured(images);
             }
         });
     }
@@ -400,17 +402,22 @@ QVector<CPylonImage> PylonCamera::grabImage(int nFrames, bool keepGrabbing)
     if (!m_camera->IsGrabbing())
         m_camera->StartGrabbing(nFrames);
 
+    qWarning() << "started grabbing";
     while(m_camera->IsGrabbing()){
         CPylonImage image;
-        m_camera->RetrieveResult(1000, ptrGrab, TimeoutHandling_Return);
+        m_camera->RetrieveResult(10000000, ptrGrab, TimeoutHandling_Return);
+        qWarning() << "result retrived";
         if (ptrGrab->GrabSucceeded()) {
+            qWarning() << "grab succeeded";
             fc.Convert(image, ptrGrab);
+            if (!keepGrabbing)
+                m_camera->StopGrabbing();
+            images += image;
+        } else {
+            qWarning() << "grab unsuccessful";
         }
-        images += image;
     }
 
-    if (!keepGrabbing)
-        m_camera->StopGrabbing();
     return images;
 }
 
@@ -418,7 +425,7 @@ void PylonCamera::restoreOriginalConfig()
 {
     if (m_originalConfig.size()) {
         qDebug() << "Restoring original camera config [ config.size="
-             << m_originalConfig.size() << "]";
+                 << m_originalConfig.size() << "]";
         CFeaturePersistence::LoadFromString(m_originalConfig, &m_camera->GetNodeMap());
     }
 }
