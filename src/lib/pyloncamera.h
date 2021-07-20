@@ -33,7 +33,7 @@ public:
     explicit PylonCamera(QObject *parent = nullptr);
     ~PylonCamera();
 
-    bool open(Pylon::IPylonDevice *pDevice = nullptr, bool saveConfig = true);
+    virtual bool open(Pylon::IPylonDevice *pDevice = nullptr, bool saveConfig = true);
     void setVideoSurface(QAbstractVideoSurface *surface);
     QAbstractVideoSurface *videoSurface() const;
     QString name() const;
@@ -73,7 +73,7 @@ public slots:
     bool start(bool saveConfig = true);
     void stop();
     bool isGrabbing() const;
-    bool capture(int n = 1, const QString &config = QString(), bool keepGrabbing = false);
+    virtual bool capture(int n = 1, const QString &config = QString(), bool keepGrabbing = false);
 
 private slots:
     void renderFrame(const QImage &frame);
