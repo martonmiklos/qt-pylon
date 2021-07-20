@@ -102,6 +102,7 @@ void PylonCamera::close()
             m_camera->StopGrabbing();
         m_camera->Close();
         m_camera->DeregisterImageEventHandler(this);
+        emit isOpenChanged();
     }
 }
 
@@ -175,8 +176,6 @@ void PylonCamera::stop()
 
     stopGrabbing();
     m_startRequested = false;
-
-    emit isOpenChanged();
 }
 
 bool PylonCamera::start(bool saveConfig)
