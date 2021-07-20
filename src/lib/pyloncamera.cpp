@@ -235,7 +235,7 @@ bool PylonCamera::capture(int nFrames, const QString &config, bool keepGrabbing)
         return false;
     }
 
-    stopGrabbing();
+    //stopGrabbing();
 
     if (!config.isEmpty()) {
         try {
