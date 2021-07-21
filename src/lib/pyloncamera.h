@@ -56,6 +56,8 @@ public:
     QString serialNumber() const;
     void setSerialNumber(const QString &serialNumber);
 
+    void loadUserDataSet(const QString &setName);
+
 signals:
     void isOpenChanged();
     void nameChanged();

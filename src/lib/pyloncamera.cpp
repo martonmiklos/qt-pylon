@@ -13,6 +13,7 @@
 
 using Pylon::CEnumParameter;
 using Pylon::CBooleanParameter;
+using Pylon::CCommandParameter;
 using Pylon::CDeviceInfo;
 using Pylon::CFeaturePersistence;
 using Pylon::CGrabResultPtr;
@@ -434,6 +435,19 @@ QString PylonCamera::serialNumber() const
 void PylonCamera::setSerialNumber(const QString &serialNumber)
 {
     m_serialNumber = serialNumber;
+}
+
+void PylonCamera::loadUserDataSet(const QString & setName)
+{
+    try {
+        auto & nodemap = m_camera->GetNodeMap();
+        // Load the User Set 1 user set
+        CEnumParameter(nodemap, "UserSetSelector").SetValue(setName.toLocal8Bit().constData());
+        CCommandParameter(nodemap, "UserSetLoad").Execute();
+    } catch (GenICam::GenericException &e) {
+        qWarning() << e.what();
+    }
+
 }
 
 QString PylonCamera::ipAddress() const
