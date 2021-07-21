@@ -401,13 +401,10 @@ QVector<CPylonImage> PylonCamera::grabImage(int nFrames, bool keepGrabbing)
     if (!m_camera->IsGrabbing())
         m_camera->StartGrabbing(nFrames);
 
-    qWarning() << "started grabbing";
     while(m_camera->IsGrabbing()){
         CPylonImage image;
         m_camera->RetrieveResult(10000000, ptrGrab, TimeoutHandling_Return);
-        qWarning() << "result retrived";
         if (ptrGrab->GrabSucceeded()) {
-            qWarning() << "grab succeeded";
             fc.Convert(image, ptrGrab);
             if (!keepGrabbing)
                 m_camera->StopGrabbing();
